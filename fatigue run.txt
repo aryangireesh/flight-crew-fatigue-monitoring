@@ -1,0 +1,7 @@
+cd "C:\Users\asus\OneDrive\Desktop\fatigue_system\backend"
+py app.py
+
+
+
+ML model loaded successfully
+Running on http://127.0.0.1:5000

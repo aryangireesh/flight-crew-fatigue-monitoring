@@ -1,0 +1,935 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Flight Crew Fatigue Monitoring System</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+
+    *{
+      box-sizing:border-box;
+    }
+
+    body{
+      margin:0;
+      font-family:"Inter",sans-serif;
+      background:linear-gradient(135deg,#0f172a,#020617);
+      color:#e5e7eb;
+    }
+
+    .container{
+      max-width:1300px;
+      margin:0 auto;
+      padding:24px;
+    }
+
+    h1{
+      margin-bottom:10px;
+    }
+
+    .top-bar{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin-bottom:20px;
+    }
+
+    .input{
+      padding:8px 12px;
+      border-radius:999px;
+      border:1px solid #374151;
+      background:#020617;
+      color:white;
+    }
+
+    .btn{
+      padding:8px 14px;
+      border:none;
+      border-radius:999px;
+      background:#6366f1;
+      color:white;
+      font-weight:600;
+      cursor:pointer;
+    }
+
+    .btn.secondary{
+      background:#111827;
+      border:1px solid #374151;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:18px;
+      margin-top:18px;
+    }
+
+    .analytics-grid{
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:18px;
+      margin-bottom:18px;
+    }
+
+    .card{
+      background:#0f172a;
+      border-radius:18px;
+      padding:18px;
+      border:1px solid #1f2937;
+    }
+
+    .score{
+      font-size:54px;
+      font-weight:bold;
+    }
+
+    .good{
+      color:#22c55e;
+    }
+
+    .moderate{
+      color:#facc15;
+    }
+
+    .high{
+      color:#fb923c;
+    }
+
+    .severe{
+      color:#f97373;
+    }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:12px;
+    }
+
+    th,td{
+      padding:8px;
+      border-bottom:1px solid #1f2937;
+      text-align:left;
+    }
+
+    form{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+
+    form input{
+      width:100%;
+      padding:8px;
+      border-radius:10px;
+      border:1px solid #374151;
+      background:#020617;
+      color:white;
+    }
+
+    .full{
+      grid-column:1/-1;
+    }
+
+    @keyframes blink{
+      0%{opacity:1;}
+      50%{opacity:0.2;}
+      100%{opacity:1;}
+    }
+
+    .live-on{
+      display:inline !important;
+      animation:blink 1s infinite;
+    }
+
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h1>Flight Crew Fatigue Monitoring System</h1>
+
+  <!-- TOP BAR -->
+
+  <div class="top-bar">
+
+    <input id="crewInput" class="input" value="P001">
+
+    <button class="btn secondary" onclick="loadHistory()">
+      Load History
+    </button>
+
+    <button id="startBtn" class="btn secondary" onclick="startAuto()">
+      Start Auto Update
+    </button>
+
+    <button id="stopBtn" class="btn secondary" onclick="stopAuto()">
+      Stop
+    </button>
+
+    <button class="btn secondary" onclick="downloadCSV()">
+      Download CSV
+    </button>
+
+    <button class="btn secondary" onclick="downloadPDF()">
+      Download PDF
+    </button>
+
+    <button class="btn secondary" onclick="window.print()">
+      Print Report
+    </button>
+
+    <input type="date" id="fromDate" class="input">
+
+    <input type="date" id="toDate" class="input">
+
+    <button class="btn secondary" onclick="filterByDate()">
+      Filter Dates
+    </button>
+
+    <span id="liveIndicator"
+      style="display:none;color:#ef4444;font-weight:bold;">
+      ● LIVE
+    </span>
+
+  </div>
+
+  <!-- FLIGHT INFO -->
+
+  <div class="card" style="margin-bottom:18px;">
+
+    <h2>Current Flight Information</h2>
+
+    <div style="
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:12px;
+    ">
+
+      <div>
+        <b>Flight No:</b><br>
+        AI203
+      </div>
+
+      <div>
+        <b>Aircraft:</b><br>
+        Boeing 737
+      </div>
+
+      <div>
+        <b>Route:</b><br>
+        Mumbai → Delhi
+      </div>
+
+      <div>
+        <b>Departure:</b><br>
+        09:45 AM
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- ANALYTICS -->
+
+  <div class="analytics-grid">
+
+    <div class="card">
+      <h3>Total Records</h3>
+      <h1 id="totalRecords">0</h1>
+    </div>
+
+    <div class="card">
+      <h3>Average Fatigue</h3>
+      <h1 id="avgFatigue">0</h1>
+    </div>
+
+    <div class="card">
+      <h3>Highest Fatigue</h3>
+      <h1 id="maxFatigue">0</h1>
+    </div>
+
+    <div class="card">
+      <h3>Severe Alerts</h3>
+      <h1 id="severeCount">0</h1>
+    </div>
+
+  </div>
+
+  <!-- MAIN GRID -->
+
+  <div class="grid">
+
+    <div class="card">
+
+      <h2>Current Fatigue Status</h2>
+
+      <div id="currentContent">
+        No data loaded.
+      </div>
+
+    </div>
+
+    <div class="card">
+
+      <h2>Enter New Fatigue Reading</h2>
+
+      <form id="fatigueForm">
+
+        <div>
+          <label>Crew ID</label>
+          <input id="fCrewId" value="P001">
+        </div>
+
+        <div>
+          <label>Duty Hours</label>
+          <input type="number" step="0.1" id="fDutyHours">
+        </div>
+
+        <div>
+          <label>Sleep Hours</label>
+          <input type="number" step="0.1" id="fSleep">
+        </div>
+
+        <div>
+          <label>Heart Rate</label>
+          <input type="number" step="0.1" id="fHr">
+        </div>
+
+        <div>
+          <label>PERCLOS</label>
+          <input type="number" step="0.01" id="fPerclos">
+        </div>
+
+        <div>
+          <label>Yawns</label>
+          <input type="number" id="fYawns" value="0">
+        </div>
+
+        <div class="full">
+          <button class="btn" type="submit">
+            Save Reading
+          </button>
+        </div>
+
+      </form>
+
+    </div>
+
+  </div>
+
+  <!-- CHART + TABLE -->
+
+  <div class="grid">
+
+    <div class="card">
+
+      <h2>Fatigue Trend</h2>
+
+      <canvas id="fatigueChart"></canvas>
+
+    </div>
+
+    <div class="card">
+
+      <h2>Recent Events</h2>
+
+      <table>
+
+        <thead>
+          <tr>
+            <th>Crew</th>
+            <th>Time</th>
+            <th>Duty</th>
+            <th>Score</th>
+          </tr>
+        </thead>
+
+        <tbody id="eventsBody"></tbody>
+
+      </table>
+
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+
+let autoTimer = null;
+let chart = null;
+let currentRows = [];
+
+function levelClass(score){
+
+  if(score <= 30) return 'good';
+  if(score <= 55) return 'moderate';
+  if(score <= 75) return 'high';
+
+  return 'severe';
+}
+
+function playAlarm(){
+
+  const audio =
+    new Audio("/static/alarm.mp3");
+
+  audio.volume = 1.0;
+
+  audio.play()
+    .then(()=>{
+      console.log("Alarm played");
+    })
+    .catch(err=>{
+      console.log(err);
+    });
+}
+
+function showAlert(score){
+
+  const old =
+    document.getElementById("fatigueAlert");
+
+  if(old){
+    old.remove();
+  }
+
+  let message = "";
+  let color = "";
+
+ if(score >= 60){
+
+  message =
+    "🚨 HIGH FATIGUE ALERT! Pilot may be unsafe for duty.";
+
+  color = "#ef4444";
+
+  // 🔊 play alarm
+  playAlarm();
+}
+  else if(score >= 56){
+
+    message =
+      "⚠ HIGH FATIGUE! Recommend immediate rest.";
+
+    color = "#fb923c";
+
+  }
+  else if(score >= 31){
+
+    message =
+      "⚠ MODERATE FATIGUE. Monitor pilot closely.";
+
+    color = "#facc15";
+
+  }
+  else{
+
+    return;
+  }
+
+  const alertBox =
+    document.createElement("div");
+
+  alertBox.id = "fatigueAlert";
+
+  alertBox.style.background = color;
+  alertBox.style.padding = "12px";
+  alertBox.style.marginTop = "12px";
+  alertBox.style.borderRadius = "12px";
+  alertBox.style.fontWeight = "bold";
+  alertBox.style.color = "white";
+
+  alertBox.innerText = message;
+
+  document.getElementById("currentContent")
+    .appendChild(alertBox);
+}
+
+function updateAnalytics(rows){
+
+  document.getElementById('totalRecords').innerText =
+    rows.length;
+
+  const avg =
+    rows.reduce((a,b)=>a+b.fatigue_score,0)
+    / rows.length;
+
+  document.getElementById('avgFatigue').innerText =
+    avg.toFixed(1);
+
+  const max =
+    Math.max(...rows.map(r=>r.fatigue_score));
+
+  document.getElementById('maxFatigue').innerText =
+    Math.round(max);
+
+  const severe =
+    rows.filter(r=>r.fatigue_score >= 76).length;
+
+  document.getElementById('severeCount').innerText =
+    severe;
+}
+
+function updateCurrentCard(d){
+
+  const sc = Math.round(d.fatigue_score);
+
+  const avg = currentRows.length
+    ? currentRows.reduce((a,b)=>a+b.fatigue_score,0)/currentRows.length
+    : 0;
+
+  document.getElementById('currentContent').innerHTML = `
+    <div>
+
+      <h1 class="score ${levelClass(sc)}">${sc}</h1>
+
+      <p><b>Crew:</b> ${d.crew_id}</p>
+
+      <p><b>Duty Hours:</b> ${d.time_on_duty_hours.toFixed(2)}</p>
+
+      <p><b>Heart Rate:</b> ${d.hr}</p>
+
+      <p><b>PERCLOS:</b> ${d.perclos}</p>
+
+      <p><b>Yawns:</b> ${d.yawns}</p>
+
+      <p><b>Average Fatigue:</b> ${avg.toFixed(2)}</p>
+
+    </div>
+  `;
+
+  showAlert(sc);
+}
+
+function renderTable(rows){
+
+  const body =
+    document.getElementById('eventsBody');
+
+  body.innerHTML = '';
+
+  rows.forEach((r,index)=>{
+
+    const tr =
+      document.createElement('tr');
+
+    // 🔥 clickable row
+    tr.style.cursor = "pointer";
+
+    // hover effect
+    tr.onmouseover = () => {
+      tr.style.background = "#1e293b";
+    };
+
+    tr.onmouseout = () => {
+      tr.style.background = "";
+    };
+
+    // click event
+    tr.onclick = () => {
+
+      console.log("Row clicked:", r);
+
+      // show selected record
+      updateCurrentCard(r);
+
+      // optional smooth scroll
+      window.scrollTo({
+        top:0,
+        behavior:'smooth'
+      });
+    };
+
+    const score =
+      Math.round(r.fatigue_score);
+
+    tr.innerHTML = `
+
+      <td>${index+1}</td>
+
+      <td>${r.crew_id}</td>
+
+      <td>${r.event_time}</td>
+
+      <td>${r.time_on_duty_hours.toFixed(2)}</td>
+
+      <td class="${levelClass(score)}">
+        ${score}
+      </td>
+
+      <td>${r.hr}</td>
+
+      <td>${r.perclos}</td>
+
+      <td>${r.yawns}</td>
+    `;
+
+    body.appendChild(tr);
+
+  });
+}
+function renderChart(rows){
+
+  const labels = rows.map(r => r.event_time);
+
+  const data = rows.map(r => r.fatigue_score);
+
+  const ctx =
+    document.getElementById('fatigueChart').getContext('2d');
+
+  if(chart) chart.destroy();
+
+  chart = new Chart(ctx, {
+
+    type:'line',
+
+    data:{
+
+      labels,
+
+      datasets:[{
+
+        label:'Fatigue Score',
+
+        data,
+
+        tension:0.4,
+
+        borderWidth:3,
+
+        pointRadius:3,
+
+        segment: {
+
+          borderColor: ctx => {
+
+            const y = ctx.p1.parsed.y;
+
+            if (y <= 30) return '#22c55e';
+            if (y <= 55) return '#facc15';
+            if (y <= 75) return '#fb923c';
+
+            return '#f97373';
+          }
+        }
+      }]
+    },
+
+    options:{
+
+      responsive:true,
+
+      animation:{
+        duration:1000,
+        easing:'easeInOutQuart'
+      },
+
+      plugins:{
+        legend:{display:false}
+      }
+    }
+  });
+}
+
+async function loadHistory(){
+
+  const crew =
+    document.getElementById('crewInput').value.trim();
+
+  if(!crew) return;
+
+  try{
+
+    const res =
+      await fetch(`http://127.0.0.1:5000/events/${crew}`);
+
+    const rows = await res.json();
+
+    if(!Array.isArray(rows) || rows.length === 0){
+      return;
+    }
+
+    const sorted =
+      rows.sort((a,b)=>
+        new Date(b.event_time)-new Date(a.event_time)
+      );
+
+    currentRows = sorted;
+
+    updateAnalytics(sorted);
+
+    const latest = sorted[0];
+
+    updateCurrentCard(latest);
+
+    renderTable(sorted);
+
+    renderChart(sorted);
+
+  }catch(err){
+
+    console.error(err);
+
+  }
+}
+
+function startAuto(){
+
+  if(autoTimer !== null) return;
+
+  loadHistory();
+
+  autoTimer = setInterval(()=>{
+
+    console.log("Auto fetching...");
+
+    loadHistory();
+
+  },4000);
+
+  document.getElementById('liveIndicator')
+    .classList.add('live-on');
+
+  document.getElementById('startBtn').disabled = true;
+
+  document.getElementById('stopBtn').disabled = false;
+}
+
+function stopAuto(){
+
+  if(autoTimer !== null){
+
+    clearInterval(autoTimer);
+
+    autoTimer = null;
+
+    document.getElementById('liveIndicator')
+      .classList.remove('live-on');
+
+    document.getElementById('startBtn').disabled = false;
+
+    document.getElementById('stopBtn').disabled = true;
+  }
+}
+
+function filterByDate(){
+
+  const from =
+    document.getElementById('fromDate').value;
+
+  const to =
+    document.getElementById('toDate').value;
+
+  if(!from || !to){
+
+    alert("Select both dates");
+
+    return;
+  }
+
+  const fromDate = new Date(from);
+  const toDate = new Date(to);
+
+  toDate.setHours(23,59,59,999);
+
+  const filtered = currentRows.filter(r => {
+
+    const eventDate = new Date(r.event_time);
+
+    return eventDate >= fromDate &&
+           eventDate <= toDate;
+  });
+
+  if(filtered.length === 0){
+
+    alert("No records found");
+
+    return;
+  }
+
+  renderTable(filtered);
+
+  renderChart(filtered);
+
+  updateCurrentCard(filtered[0]);
+}
+
+function downloadCSV(){
+
+  const crew =
+    document.getElementById('crewInput').value.trim();
+
+  fetch(`/events/${crew}`)
+    .then(res=>res.json())
+    .then(data=>{
+
+      let csv =
+      "Crew ID,Event Time,Duty Hours,Fatigue Score,HR,PERCLOS,Yawns\n";
+
+      data.forEach(d=>{
+
+        csv +=
+        `${d.crew_id},${d.event_time},${d.time_on_duty_hours},${d.fatigue_score},${d.hr},${d.perclos},${d.yawns}\n`;
+
+      });
+
+      const blob =
+        new Blob([csv],{type:'text/csv'});
+
+      const url =
+        window.URL.createObjectURL(blob);
+
+      const a =
+        document.createElement('a');
+
+      a.href = url;
+
+      a.download =
+        `${crew}_fatigue_report.csv`;
+
+      a.click();
+    });
+}
+
+async function downloadPDF(){
+
+  const { jsPDF } = window.jspdf;
+
+  const doc = new jsPDF();
+
+  doc.setFontSize(18);
+
+  doc.text("Flight Crew Fatigue Report",20,20);
+
+  doc.setFontSize(12);
+
+  doc.text(
+    "Generated by Fatigue Monitoring System",
+    20,
+    30
+  );
+
+  let y = 50;
+
+  currentRows.forEach(r => {
+
+    doc.text(
+
+      `${r.crew_id} | Score: ${Math.round(r.fatigue_score)} | HR: ${r.hr}`,
+
+      20,
+
+      y
+    );
+
+    y += 10;
+
+    if(y > 270){
+
+      doc.addPage();
+
+      y = 20;
+    }
+
+  });
+
+  const canvas =
+    document.getElementById('fatigueChart');
+
+  const imgData =
+    canvas.toDataURL('image/png');
+
+  doc.addPage();
+
+  doc.text("Fatigue Trend Graph",20,20);
+
+  doc.addImage(imgData,'PNG',15,30,180,80);
+
+  doc.save("fatigue_report.pdf");
+}
+
+document.getElementById('fatigueForm')
+.addEventListener('submit', async (e)=>{
+
+  e.preventDefault();
+
+  const crewId =
+    document.getElementById('fCrewId').value.trim();
+
+  const dutyHours =
+    parseFloat(document.getElementById('fDutyHours').value);
+
+  const sleep =
+    parseFloat(document.getElementById('fSleep').value);
+
+  const hr =
+    parseFloat(document.getElementById('fHr').value);
+
+  const perclos =
+    parseFloat(document.getElementById('fPerclos').value);
+
+  const yawns =
+    parseInt(document.getElementById('fYawns').value);
+
+  const now = new Date();
+
+  const payload = {
+
+    crew_id: crewId,
+
+    event_time: now.toISOString(),
+
+    duty_start:
+      new Date(
+        now.getTime() - dutyHours*3600*1000
+      ).toISOString(),
+
+    hr,
+
+    perclos,
+
+    yawns,
+
+    actual_sleep_last_24h: sleep
+  };
+
+  await fetch('/event',{
+
+    method:'POST',
+
+    headers:{
+      'Content-Type':'application/json'
+    },
+
+    body:JSON.stringify(payload)
+
+  });
+
+  document.getElementById('crewInput').value =
+    crewId;
+
+  await loadHistory();
+});
+
+window.addEventListener('load',()=>{
+
+  loadHistory();
+
+  document.getElementById('stopBtn').disabled = true;
+
+});
+
+</script>
+
+</body>
+</html>
